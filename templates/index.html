@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veera AI Chat Application</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f1f1f1;
+        }
+        .chat {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 600px;
+            margin: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #ffffff;
+        }
+        .chat-header {
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+        }
+        .chat-body {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+        .chat-message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            width: fit-content;
+            max-width: 80%;
+        }
+        .chat-message.user {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-message.bot {
+            background-color: #e2e3e5;
+            color: black;
+            align-self: flex-start;
+        }
+        .chat-message.bot pre {
+            margin: 0;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .chat-footer {
+            padding: 15px;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            border-top: 1px solid #dee2e6;
+        }
+        .chat-footer input {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .chat-footer button {
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="chat">
+    <div class="chat-header">
+        Sreesailam Veera Babu
+    </div>
+    <div class="chat-body" id="chat-body">
+    </div>
+    <div class="chat-footer">
+        <input type="text" class="form-control" id="message-input" placeholder="Type your message here...">
+        <button class="btn btn-primary" id="send-button">Send</button>
+        <button class="btn btn-secondary" id="audio-button">🔊</button>
+        <button class="btn btn-secondary" id="voice-button">🎤</button>
+        <button class="btn btn-secondary" id="stop-button">⏹️</button> <!-- Stop Button -->
+        <button class="btn btn-secondary" id="copy-button">📋</button>
+    </div>
+</div>
+
+<!-- jQuery and Bootstrap JS -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.6/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/5.3.0/js/bootstrap.min.js"></script>
+<script>
+    $(document).ready(function () {
+        let lastBotResponse = ""; // Store the last bot response
+        let recognition; // Speech recognition instance
+        let isSpeaking = false; // Flag to check if the bot is speaking
+
+        // Check if SpeechRecognition is supported
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+
+            recognition.onresult = function (event) {
+                const userMessage = event.results[0][0].transcript;
+                $('#message-input').val(userMessage); // Populate the input field with recognized speech
+                sendMessage(); // Automatically send the message
+            };
+
+            recognition.onerror = function (event) {
+                alert('Error occurred during voice recognition: ' + event.error);
+            };
+        } else {
+            alert('Voice recognition not supported in this browser.');
+            $('#voice-button').prop('disabled', true); // Disable the button if not supported
+        }
+
+        // Voice button click handler
+        $('#voice-button').click(function () {
+            if (!isSpeaking) {
+                recognition.start(); // Start voice recognition
+            }
+        });
+
+        // Send button click handler
+        $('#send-button').click(function () {
+            sendMessage();
+        });
+
+        // Enter key press handler
+        $('#message-input').keypress(function (e) {
+            if (e.which === 13) {
+                sendMessage();
+            }
+        });
+
+        // Audio button click handler
+        $('#audio-button').click(function () {
+            if (lastBotResponse) {
+                const speech = new SpeechSynthesisUtterance(lastBotResponse);
+                speech.onstart = function() {
+                    isSpeaking = true; // Set speaking flag when bot starts speaking
+                };
+                speech.onend = function() {
+                    isSpeaking = false; // Reset speaking flag after bot finishes speaking
+                    recognition.start(); // Restart voice recognition after speaking
+                };
+                window.speechSynthesis.speak(speech);
+            } else {
+                alert('No bot response to read.');
+            }
+        });
+
+        // Stop button click handler
+        $('#stop-button').click(function () {
+            if (isSpeaking) {
+                window.speechSynthesis.cancel(); // Stop speech synthesis
+                isSpeaking = false; // Reset speaking flag
+            } else {
+                alert('No speech is currently being read.');
+            }
+        });
+
+        // Copy button click handler
+        $('#copy-button').click(function () {
+            if (lastBotResponse) {
+                navigator.clipboard.writeText(lastBotResponse).then(function () {
+                    alert('Response copied to clipboard!');
+                }, function (err) {
+                    console.error('Could not copy text: ', err);
+                });
+            } else {
+                alert('No bot response to copy.');
+            }
+        });
+
+        function sendMessage() {
+            var userMessage = $('#message-input').val().trim();
+
+            if (userMessage) {
+                // Add user message to chat
+                appendMessage('user', userMessage);
+
+                // Clear the input field
+                $('#message-input').val("");
+
+                // Scroll to the latest message
+                scrollToBottom();
+
+                // Make the AJAX call
+                $.ajax({
+                    url: '/chat',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ "message": userMessage }),
+                    success: function (response) {
+                        lastBotResponse = response.response; // Update the last bot response
+                        $('#chat-body').append('<div class="chat-message bot"><pre>' + lastBotResponse + '</pre></div>');
+                        // Automatically play bot's response as speech
+                        const botSpeech = new SpeechSynthesisUtterance(lastBotResponse);
+                        botSpeech.onstart = function() {
+                            isSpeaking = true;
+                        };
+                        botSpeech.onend = function() {
+                            isSpeaking = false;
+                            recognition.start(); // Restart voice recognition after bot finishes speaking
+                        };
+                        window.speechSynthesis.speak(botSpeech);
+                        scrollToBottom();
+                    },
+                    error: function (xhr, status, error) {
+                        lastBotResponse = 'Sorry, there was an error processing your request.';
+                        appendMessage('bot', lastBotResponse);
+                        console.error("Error: " + error);
+                    }
+                });
+            }
+        }
+
+        function appendMessage(sender, message) {
+            var messageClass = sender === 'user' ? 'chat-message user' : 'chat-message bot';
+            $('#chat-body').append('<div class="' + messageClass + '">' + message + '</div>');
+        }
+
+        function scrollToBottom() {
+            $('#chat-body').scrollTop($('#chat-body')[0].scrollHeight);
+        }
+    });
+</script>
+</body>
+</html>
